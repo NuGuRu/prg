@@ -1,0 +1,185 @@
+<project name="crake-project" default="build" basedir=".">
+<property environment="env"/>
+
+<!-- <target name="build"
+        depends="prepare,lint,phploc,pdepend,phpmd-ci,phpcs-ci,phpcpd,phpdoc,phpunit,phpcb"/> -->
+<!-- <target name="build"
+        depends="prepare,lint,phpunit"/> -->
+<target name="build"
+        depends="prepare,phpunit"/>
+
+<!-- target name="build-parallel"
+        depends="prepare,lint,tools-parallel,phpunit,phpcb"/-->
+<target name="build-parallel"
+        depends="prepare,lint"/>
+
+
+<target name="tools-parallel"
+        description="Run tools in parallel">
+  <parallel threadCount="2">
+   <sequential>
+    <antcall target="pdepend"/>
+    <antcall target="phpmd-ci"/>
+   </sequential>
+   <antcall target="phpcpd"/>
+   <antcall target="phpcs-ci"/>
+   <antcall target="phploc"/>
+   <antcall target="phpdoc"/>
+  </parallel>
+</target>
+
+
+<target name="clean">
+  <delete dir="${basedir}/build/api"/>
+  <delete dir="${basedir}/build/code-browser"/>
+  <delete dir="${basedir}/build/coverage"/>
+  <delete dir="${basedir}/build/logs"/>
+  <delete dir="${basedir}/build/pdepend"/>
+
+  <delete dir="${basedir}/build/rpm" />
+</target>
+
+
+<target name="prepare" depends="clean"
+        description="Prepare for build">
+<!-- Create build directories -->
+<mkdir dir="${basedir}/build/api"/>
+<mkdir dir="${basedir}/build/code-browser"/>
+<mkdir dir="${basedir}/build/coverage"/>
+<mkdir dir="${basedir}/build/logs"/>
+<mkdir dir="${basedir}/build/pdepend"/>
+
+<mkdir dir="${basedir}/build/rpm"/>
+<mkdir dir="${basedir}/build/rpm/SPECS"/>
+<mkdir dir="${basedir}/build/rpm/SOURCES"/>
+<mkdir dir="${basedir}/build/rpm/BUILD"/>
+<mkdir dir="${basedir}/build/rpm/SRPMS"/>
+<mkdir dir="${basedir}/build/rpm/RPMS"/>
+<mkdir dir="${basedir}/build/rpm/RPMS/noarch"/>
+</target>
+
+<target name="lint">
+  <apply executable="/usr/local/zend/bin/php" failonerror="true">
+   <arg value="-l" />
+
+   <fileset dir="${basedir}/">
+    <include name="**/*.php" />
+    <modified />
+   </fileset>
+
+  </apply>
+</target>
+
+<target name="phploc" description="Measure project size using PHPLOC">
+  <exec executable="/usr/local/zend/bin/phploc">
+   <arg value="--log-csv" />
+   <arg value="${basedir}/build/logs/phploc.csv" />
+   <arg path="${basedir}" />
+  </exec>
+ </target>
+
+<target name="pdepend"
+         description="Calculate software metrics using PHP_Depend">
+  <exec executable="/usr/local/zend/bin/pdepend">
+   <arg value="--jdepend-xml=${basedir}/build/logs/jdepend.xml" />
+   <arg value="--jdepend-chart=${basedir}/build/pdepend/dependencies.svg" />
+   <arg value="--overview-pyramid=${basedir}/build/pdepend/overview-pyramid.svg" />
+   <arg path="${basedir}" />
+  </exec>
+</target>
+
+<target name="phpmd"
+         description="Perform project mess detection using PHPMD">
+  <exec executable="/usr/local/zend/bin/phpmd">
+   <arg path="${basedir}" />
+   <arg value="text" />
+   <arg value="${basedir}/build/phpmd.xml" />
+  </exec>
+ </target>
+
+<target name="phpmd-ci"
+         description="Perform project mess detection using PHPMD">
+  <exec executable="/usr/local/zend/bin/phpmd">
+   <arg path="${basedir}" />
+   <arg value="xml" />
+   <arg value="codesize,unusedcode" />
+   <arg value="--reportfile" />
+   <arg value="${basedir}/build/logs/pmd.xml" />
+  </exec>
+ </target>
+
+<target name="phpcs"
+         description="Find coding standard violations using PHP_CodeSniffer">
+  <exec executable="/usr/local/zend/bin/phpcs">
+   <arg value="--standard=${basedir}/build/phpcs.xml" />
+   <arg path="${basedir}" />
+  </exec>
+ </target>
+
+<target name="phpcs-ci"
+         description="Find coding standard violations using PHP_CodeSniffer">
+  <exec executable="/usr/local/zend/bin/phpcs" output="/dev/null">
+   <arg value="--report=checkstyle" />
+   <arg value="--report-file=${basedir}/build/logs/checkstyle.xml" />
+   <arg value="--standard=${basedir}/build/phpcs.xml" />
+   <arg path="${basedir}" />
+  </exec>
+ </target>
+
+<target name="phpcpd" description="Find duplicate code using PHPCPD">
+  <exec executable="/usr/local/zend/bin/phpcpd">
+   <arg value="--log-pmd" />
+   <arg value="${basedir}/build/logs/pmd-cpd.xml" />
+   <arg path="${basedir}" />
+  </exec>
+ </target>
+
+
+<target name="phpdoc"
+         description="Generate API documentation using PHPDocumentor">
+  <exec executable="/usr/local/zend/bin/phpdoc">
+   <arg value="--directory" />
+   <arg path="${basedir}" />
+   <arg value="--target" />
+   <arg path="${basedir}/build/api" />
+  </exec>
+ </target>
+
+
+<target name="phpunit" description="Run unit tests with PHPUnit">
+ <exec executable="/usr/local/zend/bin/phpunit" failonerror="true" />
+</target>
+
+ <target name="phpcb"
+         description="Aggregate tool output with PHP_CodeBrowser">
+  <exec executable="/usr/local/zend/bin/phpcb">
+   <arg value="--log" />
+   <arg path="${basedir}/build/logs" />
+   <arg value="--source" />
+   <arg path="${basedir}" />
+   <arg value="--output" />
+   <arg path="${basedir}/build/code-browser" />
+  </exec>
+ </target>
+
+
+<target name="tarball">
+<echo message="Creating source tarball for ${env.JOB_NAME}"/>
+<tar destfile="${basedir}/build/rpm/SOURCES/ESEYE-${env.JOB_NAME}.tar.gz" 
+     basedir="${basedir}" 
+     compression="gzip"
+     excludes="build/**" />
+</target>
+
+<target name="rpm" depends="build,tarball">
+ <echo message="Creating RPM package for ${env.JOB_NAME}"/>
+ <copy file="${basedir}/messaging.spec" todir="${basedir}/build/rpm/SPECS/"/>
+ <rpm
+        specFile="messaging.spec"
+    command='-ba --define "buildnumber ${env.BUILD_NUMBER}" --define "jobname ${env.JOB_NAME}"'
+        topDir="build/rpm"
+        cleanBuildDir="true"
+        failOnError="true"/>
+</target>
+
+</project>

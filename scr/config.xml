@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <scm class="hudson.scm.NullSCM"/>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command># Clean up and create directories
+for dir in BUILD RPMS SOURCES SPECS SRPMS
+do
+ [[ -d $dir ]] &amp;&amp; rm -Rf $dir
+  mkdir $dir
+done
+
+# Put our files in the right place
+cp -r /vagrant/src/SOURCES/* SOURCES/.
+cp /vagrant/src/SPECS/drupal8rpmjenkins.spec SPECS/.
+
+# Create rpm in RPMS/noarch/
+rpmbuild --define '_topdir '`pwd` --define 'BUILD_NUMBER '$BUILD_NUMBER -ba SPECS/drupal8rpmjenkins.spec
+
+rm -f /var/www/html/repo/*.rpm
+cp RPMS/noarch/* /var/www/html/repo/
+
+cd /var/www/html/repo
+createrepo .</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>
